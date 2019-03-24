@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>Digit Recognition</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, target-densitydpi=device-dpi" />
+	</head>
+	<body>
+		<div style="width:100%;height:20px;position:fixed;top:0;background:#EDEDED;"></div>
+		<div class="container">
+			<span id="title">Please Plot the Number</span>
+			<canvas id="canvas" width="280" height="280"></canvas>
+			<div class="result" style="margin-top:25px;">
+				<span id="number1"></span>
+				<span id="prob1"></span>
+			</div>
+			<div class="result" style="margin-top:30px">
+				<span id="number2"></span>
+				<span id="prob2"></span>
+			</div>
+			<img id="cancel" src="cancel.png" onclick="cancel()" style="display:none" />
+		</div>
+		
+		<style>
+			body {
+				-webkit-user-select:none;
+				-moz-user-select:none;
+				-ms-user-select:none;
+				user-select:none;
+				background: #EDEDED;
+				margin: 0;
+				padding: 0;
+			}
+			.container {
+				width: 100%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				flex-direction: column;
+				position: fixed;
+			}
+			#title {
+				color:black;
+				font-size:30px;
+				font-weight:bold;
+				margin-top:20px;
+			}
+			#canvas {
+				border: solid 1px gray;
+				margin-top: 20px;
+			}
+			.result {
+				width: 100%;
+				min-height: 70px;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+			}
+			#loading {
+				height:70px;
+				color:black;
+				font-size:24px;
+				font-weight:bold;
+				display:flex;
+				align-items: center;
+				justify-content: center;
+			}
+			#number1 {
+				color:black;
+				font-size:54px;
+				font-weight:bold;
+				height: 58px;
+			}
+			#number2 {
+				color:black;
+				font-size:42px;
+				height: 46px;
+				font-weight:bold;
+			}
+			#prob1 {
+				color:#888;;
+				font-size:16px;
+				font-weight:bold;
+			}
+			#prob2 {
+				color:#888;;
+				font-size:14px;
+				font-weight:bold;
+			}
+			#cancel {
+				position: fixed;
+				width: 50px;
+				height: 50px;
+				top: 365px;
+				right: calc(50vw - 142px);
+			}
+		</style>
+
+		<script>
+			var pathX = []
+			var pathY = []
+			var action = []
+			var canvas = document.getElementById("canvas")
+			var painter = canvas.getContext("2d")
+			var isDrawing = false
+
+			canvas.onmousedown = function (e) {
+				isDrawing = true
+				var event = e || window.event
+				addPoint(event.clientX - this.offsetLeft, event.clientY - this.offsetTop, 0)
+			}
+
+			canvas.onmousemove = function (e) {
+				if (isDrawing) {
+					var event = e || window.event
+					var color = '#000'
+					var width = 35
+
+					addPoint(event.clientX - this.offsetLeft, event.clientY - this.offsetTop, 1)
+					updateCanvas(color, width)
+				}
+			}
+
+			canvas.onmouseup = function () {
+				isDrawing = false
+				saveImg()
+			}
+
+			canvas.onmouseleave = function () {
+				isDrawing = false
+			}
+
+			canvas.ontouchstart = function (e) {
+				var event = e || window.event
+				addPoint(event.touches[0].clientX - this.offsetLeft, event.touches[0].clientY - this.offsetTop, 0)
+			}
+
+			canvas.ontouchmove = function (e) {
+				var event = e || window.event
+				var color = '#000'
+				var width = 35
+
+				addPoint(event.touches[0].clientX - this.offsetLeft, event.touches[0].clientY - this.offsetTop, 1)
+				updateCanvas(color, width)
+			}
+
+			canvas.ontouchend = function () {
+				isDrawing = false
+				saveImg()
+			}
+
+			function addPoint (x, y, a) {
+				pathX.push(x)
+				pathY.push(y)
+				action.push(a)
+			}
+
+			function updateCanvas (color, width) {
+
+				painter.strokeStyle = color
+				painter.lineWidth = width
+				painter.lineJoin = "round"
+
+				for (var i = 0, l = pathX.length; i < l; i++) {
+
+					painter.beginPath()
+					if (action[i]) painter.moveTo(pathX[i - 1], pathY[i - 1])
+					else painter.moveTo(pathX[i] - 1, pathY[i] - 1)
+
+					painter.lineTo(pathX[i], pathY[i])
+					painter.closePath()
+					painter.stroke()
+				}
+			}
+
+			function saveImg () {
+				document.getElementById("title").innerHTML = "Loading..."
+				var img = document.createElement("img")
+
+				img.onload = function () {
+					var vCanvas = document.createElement("canvas")
+					var vContext = vCanvas.getContext("2d")
+					vCanvas.width = 28
+					vCanvas.height = 28
+					vContext.drawImage(img, 0, 0, 28, 28)
+					
+					var imgSend = vCanvas.toDataURL("image/png").replace(/\+/g, "%2B").replace(/=/g, "%3D")
+
+					ajaxPost("http://127.0.0.1:8000", imgSend, (res) => {
+						var result = JSON.parse(res)
+						document.getElementById("title").innerHTML = "Please Plot the Number"
+						document.getElementById("number1").innerHTML = result.num1
+						document.getElementById("number2").innerHTML = result.num2
+						document.getElementById("prob1").innerHTML = result.prob1 + '%'
+						document.getElementById("prob2").innerHTML = result.prob2 + '%'
+						document.getElementById("cancel").style.display = ""
+					}, (fail) => {
+						cancel()
+						console.log(fail)
+					})
+				}
+				
+				img.src = canvas.toDataURL("image/png")
+			}
+
+			function cancel () {
+				document.getElementById("title").innerHTML = "Please Plot the Number"
+				document.getElementById("number1").innerHTML = ""
+				document.getElementById("number2").innerHTML = ""
+				document.getElementById("prob1").innerHTML = ""
+				document.getElementById("prob2").innerHTML = ""
+				document.getElementById("cancel").style.display = "none"
+				painter.clearRect(0, 0, canvas.width, canvas.height)
+				pathX = []
+				pathY = []
+				action = []
+			}
+
+			function ajaxPost (url, data, fnSucceed, fnFail) {
+				var ajax
+				try { ajax = new XMLHttpRequest() } catch (e) {
+					try { ajax = new ActiveXObject("Msxml2.XMLHTTP") } catch (e) {
+						try { ajax = new ActiveXObject("Microsoft.XMLHTTP") } catch (e) {
+							return false
+						}
+					}
+				}
+				ajax.open("post", url, true)
+				ajax.setRequestHeader("Content-Type" , "application/x-www-form-urlencoded")
+				ajax.onreadystatechange = function () {
+					if (ajax.readyState == 4) {
+						if (ajax.status == 200) {
+							fnSucceed(ajax.responseText)
+						} else {
+							fnFail(ajax.status)
+						}
+					}
+				}
+				ajax.send(data)
+			}
+		</script>
+	</body>
+</html>
